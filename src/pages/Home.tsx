@@ -7,7 +7,7 @@ import type { MutableRefObject } from 'react';
 import { Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../store/useStore';
-import { PlanetOrb } from '../components/3d/PlanetOrb';
+import { PlanetOrb, priorityPreload } from '../components/3d/PlanetOrb';
 import { Planet } from '../data/planets';
 
 // --- STEP 1: Updated Constants ---
@@ -223,6 +223,12 @@ export function Home() {
   const hoveredIndexRef = useRef(-1);
   const lastClickRef = useRef(0);
 
+// Kick off prioritised texture loading whenever the active planet changes
+  useEffect(() => {
+    priorityPreload(planets[currentIndex]?.id ?? 'earth');
+  }, [currentIndex, planets]);
+
+  
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
