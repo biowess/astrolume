@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Shell } from './components/layout/Shell';
@@ -52,7 +52,6 @@ export default function App() {
         await Promise.allSettled([
           fetchPlanets(), 
           preloadPlanetTextures(),
-          // 👇 THIS IS THE NEW LINE WE ADDED 👇
           new Promise((resolve) => setTimeout(resolve, 3500))
         ]);
       } finally {
@@ -66,11 +65,11 @@ export default function App() {
   }, [fetchPlanets]);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       {bootReady && <AppRoutes />}
       <AnimatePresence>
         {!bootReady && <SplashScreen key="splash" />}
       </AnimatePresence>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
