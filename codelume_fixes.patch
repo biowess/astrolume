@@ -1,0 +1,741 @@
+--- /tmp/planetarium_orig/planetarium/src/App.tsx	2026-04-19 11:07:14.000000000 +0000
++++ /tmp/planetarium_new/App.tsx	2026-04-19 11:26:39.457639197 +0000
+@@ -1,5 +1,6 @@
+-import { BrowserRouter, Routes, Route } from 'react-router-dom';
++import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+ import { useEffect, useState } from 'react';
++import { AnimatePresence, motion } from 'motion/react';
+ import { Shell } from './components/layout/Shell';
+ import { SplashScreen } from './components/layout/SplashScreen';
+ import { Home } from './pages/Home';
+@@ -11,6 +12,34 @@
+ import { useStore } from './store/useStore';
+ import { preloadPlanetTextures } from './components/3d/PlanetOrb';
+ 
++function AppRoutes() {
++  const location = useLocation();
++
++  return (
++    <Shell>
++      <AnimatePresence mode="wait" initial={false}>
++        <motion.div
++          key={location.pathname}
++          className="relative min-h-full w-full"
++          initial={{ opacity: 0, y: 10 }}
++          animate={{ opacity: 1, y: 0 }}
++          exit={{ opacity: 0, y: -10 }}
++          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
++        >
++          <Routes location={location}>
++            <Route path="/" element={<Home />} />
++            <Route path="/planet/:id" element={<PlanetDetail />} />
++            <Route path="/bookmarks" element={<Bookmarks />} />
++            <Route path="/documentation" element={<Docs />} />
++            <Route path="/about" element={<About />} />
++            <Route path="/settings" element={<Settings />} />
++          </Routes>
++        </motion.div>
++      </AnimatePresence>
++    </Shell>
++  );
++}
++
+ export default function App() {
+   const fetchPlanets = useStore((state) => state.fetchPlanets);
+   const [bootReady, setBootReady] = useState(false);
+@@ -20,10 +49,7 @@
+ 
+     (async () => {
+       try {
+-        await Promise.allSettled([
+-          fetchPlanets(),
+-          preloadPlanetTextures(),
+-        ]);
++        await Promise.allSettled([fetchPlanets(), preloadPlanetTextures()]);
+       } finally {
+         if (!cancelled) setBootReady(true);
+       }
+@@ -34,22 +60,12 @@
+     };
+   }, [fetchPlanets]);
+ 
+-  if (!bootReady) {
+-    return <SplashScreen />;
+-  }
+-
+   return (
+     <BrowserRouter>
+-      <Shell>
+-        <Routes>
+-          <Route path="/" element={<Home />} />
+-          <Route path="/planet/:id" element={<PlanetDetail />} />
+-          <Route path="/bookmarks" element={<Bookmarks />} />
+-          <Route path="/documentation" element={<Docs />} />
+-          <Route path="/about" element={<About />} />
+-          <Route path="/settings" element={<Settings />} />
+-        </Routes>
+-      </Shell>
++      {bootReady && <AppRoutes />}
++      <AnimatePresence>
++        {!bootReady && <SplashScreen key="splash" />}
++      </AnimatePresence>
+     </BrowserRouter>
+   );
+-}
+\ No newline at end of file
++}
+--- /tmp/planetarium_orig/planetarium/src/pages/Home.tsx	2026-04-19 11:19:27.000000000 +0000
++++ /tmp/planetarium_new/Home.tsx	2026-04-19 11:26:39.467732010 +0000
+@@ -1,27 +1,3 @@
+-/**
+- * Home.tsx — Cinematic Carousel (Production Pass)
+- *
+- * Upgrades over v2:
+- * 1. Exponential-decay approach replaces linear lerp:
+- *    pos += (target - pos) * (1 - exp(-SPEED * dt))
+- *    This gives fast response at the start, smooth ease-out near target.
+- *
+- * 2. Continuous smooth scale based on actual (continuous, not snapped) offset —
+- *    no hard jump at integer boundaries.
+- *
+- * 3. Per-planet size multiplier passed as carouselScale to PlanetOrb.
+- *    Jupiter visibly larger than Mercury at the same carousel slot.
+- *
+- * 4. Hover state: a ref tracks the hovered planet index; useFrame applies a
+- *    subtle extra scale pulse (no React re-renders per hover frame).
+- *
+- * 5. Click debounce: a ref tracks the last setIndex timestamp to prevent
+- *    rapid-click desync. Minimum 120ms between index changes.
+- *
+- * 6. Opacity: computed per-frame from absOffset, not a hard visibility toggle.
+- *    Planets fade smoothly rather than popping in/out.
+- */
+-
+ import { useEffect, useCallback, useRef, useState } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
+@@ -34,37 +10,25 @@
+ import { PlanetOrb } from '../components/3d/PlanetOrb';
+ import { Planet } from '../data/planets';
+ 
++const SPACING = 2.15;
++const DEPTH_STEP = 1.25;
++const FRONT_Z = 1.35;
++const APPROACH = 7.5;
++const CAROUSEL_SCALE_CENTER = 1.08;
++const CAROUSEL_SCALE_NEAR = 0.68;
++const CAROUSEL_SCALE_FAR = 0.48;
++const MIN_CLICK_MS = 140;
+ 
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Constants
+-// ─────────────────────────────────────────────────────────────────────────────
+-const SPACING      = 3.8;   // world-units between planet centres
+-const APPROACH     = 7.5;   // exponential-decay speed constant
+-const CAROUSEL_SCALE_CENTER = 1.0;
+-const CAROUSEL_SCALE_NEAR   = 0.52;
+-const CAROUSEL_SCALE_FAR    = 0.34;
+-const HOVER_BOOST  = 0.06;  // extra scale fraction on hover
+-const MIN_CLICK_MS = 140;   // debounce rapid clicks
+-
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Shared state refs (passed to canvas children)
+-// ─────────────────────────────────────────────────────────────────────────────
+ interface SharedRefs {
+-  currentIndex: React.MutableRefObject<number>;
+-  hoveredIndex: React.MutableRefObject<number>;
++  currentIndex: MutableRefObject<number>;
++  hoveredIndex: MutableRefObject<number>;
+   totalPlanets: number;
+ }
+ 
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Smooth lerp helper — exponential approach (frame-rate independent)
+-// ─────────────────────────────────────────────────────────────────────────────
+ function expApproach(current: number, target: number, speed: number, dt: number) {
+   return target + (current - target) * Math.exp(-speed * dt);
+ }
+ 
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Invisible click sphere that reports pointer events to r3f
+-// ─────────────────────────────────────────────────────────────────────────────
+ function ClickSphere({ onClick, onHover, onUnhover }: {
+   onClick: () => void;
+   onHover: () => void;
+@@ -72,9 +36,20 @@
+ }) {
+   return (
+     <mesh
+-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+-      onPointerEnter={(e) => { e.stopPropagation(); onHover(); document.body.style.cursor = 'pointer'; }}
+-      onPointerLeave={(e) => { e.stopPropagation(); onUnhover(); document.body.style.cursor = 'default'; }}
++      onClick={(e) => {
++        e.stopPropagation();
++        onClick();
++      }}
++      onPointerEnter={(e) => {
++        e.stopPropagation();
++        onHover();
++        document.body.style.cursor = 'pointer';
++      }}
++      onPointerLeave={(e) => {
++        e.stopPropagation();
++        onUnhover();
++        document.body.style.cursor = 'default';
++      }}
+     >
+       <sphereGeometry args={[1.3, 8, 8]} />
+       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+@@ -82,9 +57,6 @@
+   );
+ }
+ 
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Per-planet carousel group
+-// ─────────────────────────────────────────────────────────────────────────────
+ interface CarouselPlanetProps {
+   planet: Planet;
+   planetIndex: number;
+@@ -93,72 +65,49 @@
+ }
+ 
+ function CarouselPlanet({ planet, planetIndex, refs, onSelect }: CarouselPlanetProps) {
+-  const groupRef    = useRef<THREE.Group>(null);
+-  const posXRef     = useRef(0);
+-  const posZRef     = useRef(0);
+-  const scaleRef    = useRef(0);
+-  const opacityRef  = useRef(0);
++  const groupRef = useRef<THREE.Group>(null);
+   const currentPos = useRef(new THREE.Vector3());
+   const targetPos = useRef(new THREE.Vector3());
++  const scaleRef = useRef(1);
++  const focusRef = useRef(0);
+ 
+-  // We drive material opacity by updating a shared uniform-like approach:
+-  // r3f doesn't provide a direct group opacity, so we modulate child mesh
+-  // opacity via a color multiplier on the group. Simplest: hide via scale.
+-  // True opacity fade requires iterating all materials — instead we use a
+-  // wrapper group scale trick: scale to near-zero when very far.
+-useFrame((_, dt) => {
+-  if (!groupRef.current) return;
+-
+-  const currentIndex = refs.currentIndex.current;
+-  const total = refs.totalPlanets;
+-
+-  let offset = planetIndex - currentIndex;
+-
+-  // wrap-around (keeps carousel circular)
+-  if (offset > total / 2) offset -= total;
+-  if (offset < -total / 2) offset += total;
+-
+-  // --- TARGET POSITION ---
+-  const spacing = 1.4;
+-  const depth = 2.0;
+-
+-  const x = offset * spacing;
+-  const z = -Math.abs(offset) * depth;
+-
+-  targetPos.current.set(x, 0, z);
+-
+-  // --- SMOOTH INTERPOLATION ---
+-  const speed = 6;
+-
+-  currentPos.current.lerp(
+-    targetPos.current,
+-    1 - Math.exp(-speed * dt)
+-  );
+-
+-  groupRef.current.position.copy(currentPos.current);
+-
+-  // --- SCALE (focus emphasis) ---
+-  const targetScale = offset === 0 ? 1 : 0.8;
+-
+-  const currentScale = groupRef.current.scale.x;
+-
+-  const newScale = THREE.MathUtils.lerp(
+-    currentScale,
+-    targetScale,
+-    1 - Math.exp(-speed * dt)
+-  );
+-
+-  groupRef.current.scale.setScalar(newScale);
++  useFrame((_, dt) => {
++    if (!groupRef.current) return;
+ 
+-  // --- OPTIONAL: subtle rotation (adds polish) ---
+-  const targetRot = offset * -0.25;
++    const currentIndex = refs.currentIndex.current;
++    const total = refs.totalPlanets;
+ 
+-  groupRef.current.rotation.y = THREE.MathUtils.lerp(
+-    groupRef.current.rotation.y,
+-    targetRot,
+-    1 - Math.exp(-speed * dt)
+-  );
+-});
++    let offset = planetIndex - currentIndex;
++    if (offset > total / 2) offset -= total;
++    if (offset < -total / 2) offset += total;
++
++    const targetFocus = offset === 0 ? 1 : 0;
++    focusRef.current = expApproach(focusRef.current, targetFocus, 11, dt);
++
++    const focusMix = focusRef.current;
++    const lateralX = offset * SPACING;
++    const backZ = -Math.abs(offset) * DEPTH_STEP - 2.5;
++
++    targetPos.current.set(
++      THREE.MathUtils.lerp(lateralX, 0, focusMix),
++      0,
++      THREE.MathUtils.lerp(backZ, FRONT_Z, focusMix)
++    );
++
++    currentPos.current.lerp(targetPos.current, 1 - Math.exp(-APPROACH * dt));
++    groupRef.current.position.copy(currentPos.current);
++
++    const targetScale = THREE.MathUtils.lerp(
++      Math.max(CAROUSEL_SCALE_FAR, CAROUSEL_SCALE_NEAR - Math.abs(offset) * 0.05),
++      CAROUSEL_SCALE_CENTER,
++      focusMix
++    );
++    scaleRef.current = expApproach(scaleRef.current, targetScale, 10, dt);
++    groupRef.current.scale.setScalar(scaleRef.current);
++
++    groupRef.current.rotation.y = expApproach(groupRef.current.rotation.y, offset * -0.18, 7.5, dt);
++    groupRef.current.renderOrder = offset === 0 ? 10 : 0;
++  });
+ 
+   return (
+     <group ref={groupRef}>
+@@ -166,37 +115,22 @@
+         planetId={planet.id}
+         primaryColor={planet.colorPrimary}
+         secondaryColor={planet.colorSecondary}
+-        isFocused={false}
++        isFocused={planetIndex === refs.currentIndex.current}
+         carouselScale={1}
+       />
+       <ClickSphere
+         onClick={onSelect}
+-        onHover={() => { refs.hoveredIndex.current = planetIndex; }}
++        onHover={() => {
++          refs.hoveredIndex.current = planetIndex;
++        }}
+         onUnhover={() => {
+-          if (refs.hoveredIndex.current === planetIndex)
+-            refs.hoveredIndex.current = -1;
++          if (refs.hoveredIndex.current === planetIndex) refs.hoveredIndex.current = -1;
+         }}
+       />
+     </group>
+   );
+ }
+ 
+-
+-
+-function FocusedPlanet({ planet }: { planet: Planet }) {
+-  return (
+-    <group>
+-      <PlanetOrb
+-        planetId={planet.id}
+-        primaryColor={planet.colorPrimary}
+-        secondaryColor={planet.colorSecondary}
+-        isFocused
+-        carouselScale={1}
+-      />
+-    </group>
+-  );
+-}
+-
+ function CanvasColorPipeline() {
+   const { gl } = useThree();
+ 
+@@ -212,12 +146,10 @@
+ function CarouselLayer({
+   planets,
+   sharedRefs,
+-  currentIndex,
+   onSelectPlanet,
+ }: {
+   planets: Planet[];
+   sharedRefs: SharedRefs;
+-  currentIndex: number;
+   onSelectPlanet: (index: number) => void;
+ }) {
+   return (
+@@ -227,21 +159,19 @@
+       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+     >
+       <CanvasColorPipeline />
+-      <ambientLight intensity={0.10} />
+-      <directionalLight position={[6, 3, 4]} intensity={2.6} />
++      <ambientLight intensity={0.11} />
++      <directionalLight position={[6, 3, 4]} intensity={2.7} />
+       <directionalLight position={[-4, -2, -3]} intensity={0.22} color="#112244" />
+ 
+-      {planets.map((planet, i) =>
+-        i === currentIndex ? null : (
+-          <CarouselPlanet
+-            key={planet.id}
+-            planet={planet}
+-            planetIndex={i}
+-            refs={sharedRefs}
+-            onSelect={() => onSelectPlanet(i)}
+-          />
+-        )
+-      )}
++      {planets.map((planet, i) => (
++        <CarouselPlanet
++          key={planet.id}
++          planet={planet}
++          planetIndex={i}
++          refs={sharedRefs}
++          onSelect={() => onSelectPlanet(i)}
++        />
++      ))}
+ 
+       <Environment preset="night" />
+       <SceneCleanup />
+@@ -249,57 +179,42 @@
+   );
+ }
+ 
+-function FocusLayer({ planet }: { planet: Planet }) {
+-  return (
+-    <Canvas
+-      camera={{ position: [0, 0, 7.5], fov: 48 }}
+-      dpr={[1, 2]}
+-      gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+-    >
+-      <CanvasColorPipeline />
+-      <ambientLight intensity={0.12} />
+-      <directionalLight position={[6, 3, 4]} intensity={2.8} />
+-      <directionalLight position={[-4, -2, -3]} intensity={0.24} color="#112244" />
+-
+-      <FocusedPlanet planet={planet} />
+-
+-      <Environment preset="night" />
+-      <SceneCleanup />
+-    </Canvas>
+-  );
+-}  
+-
+-  
+-
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Scene wrapper — cleans up cursor on unmount
+-// ─────────────────────────────────────────────────────────────────────────────
+ function SceneCleanup() {
+   const { gl } = useThree();
++
+   useEffect(() => {
+-    return () => { gl.domElement.style.cursor = 'default'; document.body.style.cursor = 'default'; };
++    return () => {
++      gl.domElement.style.cursor = 'default';
++      document.body.style.cursor = 'default';
++    };
+   }, [gl]);
++
+   return null;
+ }
+ 
+-// ─────────────────────────────────────────────────────────────────────────────
+-// Home page
+-// ─────────────────────────────────────────────────────────────────────────────
+ export function Home() {
+   const navigate = useNavigate();
+   const { planets, activePlanetId, setActivePlanet, settings } = useStore();
+ 
+   const [currentIndex, setCurrentIndex] = useState(
+-    () => Math.max(0, planets.findIndex(p => p.id === activePlanetId))
++    () => Math.max(0, planets.findIndex((p) => p.id === activePlanetId))
+   );
+ 
+   const currentIndexRef = useRef(currentIndex);
+   const hoveredIndexRef = useRef(-1);
+-  const lastClickRef    = useRef(0);
++  const lastClickRef = useRef(0);
+ 
+-  useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
++  useEffect(() => {
++    currentIndexRef.current = currentIndex;
++  }, [currentIndex]);
++
++  useEffect(() => {
++    const nextIndex = planets.findIndex((p) => p.id === activePlanetId);
++    if (nextIndex >= 0 && nextIndex !== currentIndex) {
++      setCurrentIndex(nextIndex);
++    }
++  }, [activePlanetId, currentIndex, planets]);
+ 
+-  // Debounced index setter
+   const goTo = useCallback((idx: number) => {
+     const now = Date.now();
+     if (now - lastClickRef.current < MIN_CLICK_MS) return;
+@@ -307,13 +222,15 @@
+     setCurrentIndex(idx);
+   }, []);
+ 
+-  const prevPlanet = useCallback(() =>
+-    goTo(currentIndexRef.current === 0 ? planets.length - 1 : currentIndexRef.current - 1),
+-  [goTo, planets.length]);
+-
+-  const nextPlanet = useCallback(() =>
+-    goTo(currentIndexRef.current === planets.length - 1 ? 0 : currentIndexRef.current + 1),
+-  [goTo, planets.length]);
++  const prevPlanet = useCallback(
++    () => goTo(currentIndexRef.current === 0 ? planets.length - 1 : currentIndexRef.current - 1),
++    [goTo, planets.length]
++  );
++
++  const nextPlanet = useCallback(
++    () => goTo(currentIndexRef.current === planets.length - 1 ? 0 : currentIndexRef.current + 1),
++    [goTo, planets.length]
++  );
+ 
+   useEffect(() => {
+     setActivePlanet(planets[currentIndex]?.id || 'earth');
+@@ -321,9 +238,10 @@
+ 
+   useEffect(() => {
+     const onKey = (e: KeyboardEvent) => {
+-      if (e.key === 'ArrowLeft')  prevPlanet();
++      if (e.key === 'ArrowLeft') prevPlanet();
+       if (e.key === 'ArrowRight') nextPlanet();
+     };
++
+     window.addEventListener('keydown', onKey);
+     return () => window.removeEventListener('keydown', onKey);
+   }, [nextPlanet, prevPlanet]);
+@@ -338,42 +256,34 @@
+   };
+ 
+   return (
+-    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
+-
+-      {/* ── Single WebGL Canvas ── */}
+-      <div className="relative w-full h-[60vh] md:h-[70vh] overflow-hidden">
+-  <div
+-    className="absolute inset-0 z-10"
+-    style={{
+-      filter: 'blur(7px) brightness(0.6) saturate(0.75)',
+-      transform: 'scale(1.05)',
+-      opacity: 0.95,
+-    }}
+-  >
+-    <CarouselLayer
+-      planets={planets}
+-      sharedRefs={sharedRefs}
+-      currentIndex={currentIndex}
+-      onSelectPlanet={goTo}
+-    />
+-  </div>
+-
+-  <div className="absolute inset-0 z-20 pointer-events-none">
+-    <FocusLayer planet={activePlanet} />
+-  </div>
+-</div>
++    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden">
++      <div className="relative h-[60vh] w-full overflow-hidden md:h-[70vh]">
++        <div
++          className="absolute inset-0 z-10"
++          style={{
++            opacity: 0.98,
++            transform: 'scale(1.02)',
++            filter: 'brightness(0.72) saturate(0.84)',
++          }}
++        >
++          <CarouselLayer
++            planets={planets}
++            sharedRefs={sharedRefs}
++            onSelectPlanet={goTo}
++          />
++        </div>
++      </div>
+ 
+-      {/* ── Nav arrows ── */}
+-      <div className="absolute top-[30vh] md:top-[35vh] -translate-y-1/2 w-full max-w-7xl px-4 md:px-12 flex justify-between pointer-events-none z-30">
++      <div className="absolute top-[30vh] z-30 flex w-full max-w-7xl -translate-y-1/2 justify-between px-4 pointer-events-none md:top-[35vh] md:px-12">
+         <button
+-          className="w-14 h-14 md:w-16 md:h-16 rounded-full glass-panel flex items-center justify-center text-[var(--accent)] hover:bg-[rgba(229,193,88,0.1)] transition-all pointer-events-auto"
++          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full glass-panel text-[var(--accent)] transition-all hover:bg-[rgba(229,193,88,0.1)] md:h-16 md:w-16"
+           onClick={prevPlanet}
+           aria-label="Previous planet"
+         >
+           <ChevronLeft size={32} strokeWidth={1} />
+         </button>
+         <button
+-          className="w-14 h-14 md:w-16 md:h-16 rounded-full glass-panel flex items-center justify-center text-[var(--accent)] hover:bg-[rgba(229,193,88,0.1)] transition-all pointer-events-auto"
++          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full glass-panel text-[var(--accent)] transition-all hover:bg-[rgba(229,193,88,0.1)] md:h-16 md:w-16"
+           onClick={nextPlanet}
+           aria-label="Next planet"
+         >
+@@ -381,7 +291,6 @@
+         </button>
+       </div>
+ 
+-      {/* ── Info panel ── */}
+       <AnimatePresence mode="wait">
+         <motion.div
+           key={activePlanet.id}
+@@ -393,12 +302,12 @@
+               ? { duration: 0 }
+               : { duration: 0.35, ease: [0.22, 1, 0.36, 1] }
+           }
+-          className="absolute bottom-10 md:bottom-16 w-full max-w-4xl px-6 flex flex-col items-center text-center z-40"
++          className="absolute bottom-10 z-40 flex w-full max-w-4xl flex-col items-center px-6 text-center md:bottom-16"
+         >
+-          <h1 className="text-4xl md:text-6xl font-sans tracking-widest uppercase mb-2">
++          <h1 className="mb-2 text-4xl font-sans uppercase tracking-widest md:text-6xl">
+             {activePlanet.name}
+           </h1>
+-          <div className="flex gap-4 md:gap-8 font-mono text-[var(--text-muted)] text-sm md:text-base uppercase tracking-widest mb-8">
++          <div className="mb-8 flex gap-4 font-mono text-sm uppercase tracking-widest text-[var(--text-muted)] md:gap-8 md:text-base">
+             <span>R: {activePlanet.radius.toLocaleString()} KM</span>
+             <span className="hidden sm:inline">|</span>
+             <span>M: {activePlanet.moons} Moons</span>
+@@ -408,24 +317,23 @@
+ 
+           <button
+             onClick={() => navigate(`/planet/${activePlanet.id}`)}
+-            className="group flex items-center gap-3 px-8 py-3 rounded-full glass-panel hover:bg-[var(--accent)] hover:text-[#030408] transition-all duration-300"
++            className="group flex items-center gap-3 rounded-full glass-panel px-8 py-3 transition-all duration-300 hover:bg-[var(--accent)] hover:text-[#030408]"
+           >
+-            <span className="font-mono uppercase tracking-widest text-sm">Full Telemetry</span>
++            <span className="font-mono text-sm uppercase tracking-widest">Full Telemetry</span>
+             <Info size={16} className="group-hover:text-[#030408]" />
+           </button>
+         </motion.div>
+       </AnimatePresence>
+ 
+-      {/* ── Index dots ── */}
+-      <div className="absolute bottom-4 md:bottom-6 flex gap-2 z-40">
++      <div className="absolute bottom-4 z-40 flex gap-2 md:bottom-6">
+         {planets.map((p, i) => (
+           <button
+             key={p.id}
+             onClick={() => goTo(i)}
+-            className={`transition-all duration-300 rounded-full ${
++            className={`rounded-full transition-all duration-300 ${
+               i === currentIndex
+-                ? 'w-6 h-2 bg-[var(--accent)]'
+-                : 'w-2 h-2 bg-[var(--text-muted)] opacity-40 hover:opacity-70'
++                ? 'h-2 w-6 bg-[var(--accent)]'
++                : 'h-2 w-2 bg-[var(--text-muted)] opacity-40 hover:opacity-70'
+             }`}
+             aria-label={`Go to ${p.name}`}
+           />
+--- /tmp/planetarium_orig/planetarium/src/components/layout/SplashScreen.tsx	2026-04-19 11:07:02.000000000 +0000
++++ /tmp/planetarium_new/SplashScreen.tsx	2026-04-19 11:26:39.480612213 +0000
+@@ -4,17 +4,41 @@
+   return (
+     <motion.div
+       className="fixed inset-0 z-[200] overflow-hidden bg-[radial-gradient(circle_at_top,#11162a_0%,#05070d_40%,#020308_100%)] text-white"
+-      initial={{ opacity: 1 }}
++      initial={{ opacity: 0 }}
+       animate={{ opacity: 1 }}
+       exit={{ opacity: 0 }}
+-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
++      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+     >
+-      <div className="absolute inset-0 opacity-70" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(116, 140, 255, 0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(229, 193, 88, 0.14), transparent 28%), radial-gradient(circle at 50% 80%, rgba(75, 198, 255, 0.12), transparent 26%)' }} />
++      <motion.div
++        className="absolute inset-0 opacity-70"
++        initial={{ opacity: 0 }}
++        animate={{ opacity: 0.7 }}
++        transition={{ duration: 0.45, ease: 'easeOut' }}
++        style={{
++          backgroundImage:
++            'radial-gradient(circle at 20% 20%, rgba(116, 140, 255, 0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(229, 193, 88, 0.14), transparent 28%), radial-gradient(circle at 50% 80%, rgba(75, 198, 255, 0.12), transparent 26%)',
++        }}
++      />
+ 
+-      <div className="absolute inset-0 opacity-35 mix-blend-screen" style={{ backgroundImage: 'radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.95), transparent 2px), radial-gradient(1px 1px at 80px 120px, rgba(255,255,255,0.8), transparent 2px), radial-gradient(2px 2px at 140px 60px, rgba(255,255,255,0.75), transparent 2px), radial-gradient(1px 1px at 220px 180px, rgba(255,255,255,0.7), transparent 2px)', backgroundSize: '260px 260px' }} />
++      <motion.div
++        className="absolute inset-0 opacity-35 mix-blend-screen"
++        initial={{ opacity: 0 }}
++        animate={{ opacity: 0.35 }}
++        transition={{ duration: 0.55, ease: 'easeOut' }}
++        style={{
++          backgroundImage:
++            'radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.95), transparent 2px), radial-gradient(1px 1px at 80px 120px, rgba(255,255,255,0.8), transparent 2px), radial-gradient(2px 2px at 140px 60px, rgba(255,255,255,0.75), transparent 2px), radial-gradient(1px 1px at 220px 180px, rgba(255,255,255,0.7), transparent 2px)',
++          backgroundSize: '260px 260px',
++        }}
++      />
+ 
+       <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
+-        <div className="relative mb-10 flex items-center justify-center">
++        <motion.div
++          className="relative mb-10 flex items-center justify-center"
++          initial={{ opacity: 0, scale: 0.96, y: 10 }}
++          animate={{ opacity: 1, scale: 1, y: 0 }}
++          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
++        >
+           <motion.div
+             className="absolute h-40 w-40 rounded-full border border-white/10 bg-white/5 blur-[1px]"
+             animate={{ scale: [1, 1.08, 1], opacity: [0.45, 0.75, 0.45] }}
+@@ -30,30 +54,51 @@
+             animate={{ y: [0, -8, 0] }}
+             transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
+           />
+-        </div>
++        </motion.div>
+ 
+-        <p className="mb-2 text-[10px] uppercase tracking-[0.45em] text-white/45">
++        <motion.p
++          className="mb-2 text-[10px] uppercase tracking-[0.45em] text-white/45"
++          initial={{ opacity: 0, y: 8 }}
++          animate={{ opacity: 1, y: 0 }}
++          transition={{ duration: 0.35, delay: 0.08 }}
++        >
+           Loading the cosmos
+-        </p>
+-        <h1 className="text-5xl sm:text-6xl md:text-7xl uppercase tracking-[0.25em] text-white">
++        </motion.p>
++        <motion.h1
++          className="text-5xl uppercase tracking-[0.25em] text-white sm:text-6xl md:text-7xl"
++          initial={{ opacity: 0, y: 10 }}
++          animate={{ opacity: 1, y: 0 }}
++          transition={{ duration: 0.4, delay: 0.12 }}
++        >
+           Astrolume
+-        </h1>
+-        <p className="mt-4 max-w-md text-sm sm:text-base text-white/60 leading-relaxed">
++        </motion.h1>
++        <motion.p
++          className="mt-4 max-w-md text-sm leading-relaxed text-white/60 sm:text-base"
++          initial={{ opacity: 0, y: 10 }}
++          animate={{ opacity: 1, y: 0 }}
++          transition={{ duration: 0.4, delay: 0.16 }}
++        >
+           Preparing planetary textures, lighting, and explorer data.
+-        </p>
++        </motion.p>
+ 
+-        <div className="mt-10 h-px w-64 max-w-[70vw] bg-white/10 overflow-hidden rounded-full">
++        <div className="mt-10 h-px w-64 max-w-[70vw] overflow-hidden rounded-full bg-white/10">
+           <motion.div
+             className="h-full w-1/2 bg-[linear-gradient(90deg,transparent,rgba(229,193,88,0.95),transparent)]"
+-            animate={{ x: ['-20%', '140%'] }}
++            initial={{ x: '-20%' }}
++            animate={{ x: '140%' }}
+             transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+           />
+         </div>
+       </div>
+ 
+-      <div className="absolute bottom-6 left-0 right-0 text-center text-[11px] tracking-[0.45em] uppercase text-white/55">
++      <motion.div
++        className="absolute bottom-6 left-0 right-0 text-center text-[11px] uppercase tracking-[0.45em] text-white/55"
++        initial={{ opacity: 0, y: 8 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.35, delay: 0.18 }}
++      >
+         BIOWESS 2026
+-      </div>
++      </motion.div>
+     </motion.div>
+   );
+-}
+\ No newline at end of file
++}
