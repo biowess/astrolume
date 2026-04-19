@@ -1,4 +1,7 @@
-# <p align="center">Astrolume</p>
+<p align="center">
+  <img src="./logo.png" alt="Astrolume" width="100%" />
+</p>
+
 <p align="center"><strong>By Biowess</strong></p>
 <p align="center">A cinematic solar-system explorer built with React, TypeScript, Vite, Tailwind CSS, and React Three Fiber.</p>
 
