@@ -15,41 +15,17 @@ export interface GalleryImage {
 }
 
 export const PLANET_TEXTURES = {
-  mercury: {
-    map: '/textures/planets/mercury/main.jpg',
-    tilt: 0.03,
-  },
-  venus: {
-    map: '/textures/planets/venus/main.jpg',
-    tilt: 0.046,
-  },
-  earth: {
-    map: '/textures/planets/earth/main.jpg',
-    clouds: '/textures/planets/earth/clouds.png',
-    tilt: 0.408,
-  },
-  mars: {
-    map: '/textures/planets/mars/main.jpg',
-    tilt: 0.44,
-  },
-  jupiter: {
-    map: '/textures/planets/jupiter/main.jpg',
-    tilt: 0.054,
-  },
-  saturn: {
-    map: '/textures/planets/saturn/main.jpg',
-    ring: '/textures/planets/saturn/rings.png',
-    tilt: 0.467,
-  },
-  uranus: {
-    map: '/textures/planets/uranus/main.jpg',
-    tilt: 1.706,
-  },
-  neptune: {
-    map: '/textures/planets/neptune/main.jpg',
-    tilt: 0.494,
-  },
-} as const;
+  mercury: { map: new URL('../public/textures/planets/mercury/main.jpg', import.meta.url).href, tilt: 0.03 },
+  venus:   { map: new URL('../public/textures/planets/venus/main.jpg',   import.meta.url).href, tilt: 0.046 },
+  earth:   { map: new URL('../public/textures/planets/earth/main.jpg',   import.meta.url).href,
+             clouds: new URL('../public/textures/planets/earth/clouds.png', import.meta.url).href, tilt: 0.408 },
+  mars:    { map: new URL('../public/textures/planets/mars/main.jpg',    import.meta.url).href, tilt: 0.44 },
+  jupiter: { map: new URL('../public/textures/planets/jupiter/main.jpg', import.meta.url).href, tilt: 0.054 },
+  saturn:  { map: new URL('../public/textures/planets/saturn/main.jpg',  import.meta.url).href,
+             ring: new URL('../public/textures/planets/saturn/rings.png', import.meta.url).href, tilt: 0.467 },
+  uranus:  { map: new URL('../public/textures/planets/uranus/main.jpg',  import.meta.url).href, tilt: 1.706 },
+  neptune: { map: new URL('../public/textures/planets/neptune/main.jpg', import.meta.url).href, tilt: 0.494 },
++};
 
 /**
  * Gallery images — all paths are local under /public/assets/planets/
