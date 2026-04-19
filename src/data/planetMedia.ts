@@ -25,7 +25,7 @@ export const PLANET_TEXTURES = {
              ring: new URL('../public/textures/planets/saturn/rings.png', import.meta.url).href, tilt: 0.467 },
   uranus:  { map: new URL('../public/textures/planets/uranus/main.jpg',  import.meta.url).href, tilt: 1.706 },
   neptune: { map: new URL('../public/textures/planets/neptune/main.jpg', import.meta.url).href, tilt: 0.494 },
-+};
+};
 
 /**
  * Gallery images — all paths are local under /public/assets/planets/
