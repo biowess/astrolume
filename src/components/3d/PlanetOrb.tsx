@@ -91,6 +91,40 @@ export async function preloadPlanetTextures() {
   await Promise.all(urls.map(loadTexture));
 }
 
+
+export function priorityPreload(currentPlanetId: string) {
+  const def = PLANET_TEXTURES[currentPlanetId as keyof typeof PLANET_TEXTURES];
+  if (!def) return;
+
+  // Priority 1: current planet (fire immediately, don't await)
+  const priority: string[] = [def.map];
+  if ('clouds' in def && def.clouds) priority.push(def.clouds);
+  if ('ring' in def && def.ring) priority.push(def.ring);
+  priority.forEach(loadTexture);
+
+  // Priority 2: everything else, one at a time during idle frames
+  const others: string[] = [];
+  for (const [id, entry] of Object.entries(PLANET_TEXTURES)) {
+    if (id === currentPlanetId) continue;
+    others.push(entry.map);
+    if ('clouds' in entry && entry.clouds) others.push(entry.clouds);
+    if ('ring' in entry && entry.ring) others.push(entry.ring);
+  }
+
+  const idle = typeof requestIdleCallback !== 'undefined'
+    ? requestIdleCallback
+    : (cb: () => void) => setTimeout(cb, 200);
+
+  let i = 0;
+  function loadNext() {
+    if (i >= others.length) return;
+    const url = others[i++];
+    if (!texCache.has(url)) loadTexture(url);
+    idle(loadNext);
+  }
+  idle(loadNext);
+}
+
 function useCachedTexture(url?: string) {
   const [tex, setTex] = useState<THREE.Texture | null>(() =>
     url ? texCache.get(url) ?? null : null
