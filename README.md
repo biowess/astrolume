@@ -5,6 +5,12 @@
 <p align="center"><strong>By Biowess</strong></p>
 <p align="center">A cinematic solar-system explorer built with React, TypeScript, Vite, Tailwind CSS, and React Three Fiber.</p>
 
+## Try it out here:
+
+<a href="https://biowess.github.io/astrolume" target="_blank">
+  <img src="https://img.shields.io/badge/Live%20Demo-Astrolume-20232A?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" />
+</a>
+
 ## Detailed Stack
 
 <p align="center">
