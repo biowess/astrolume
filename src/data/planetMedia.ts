@@ -15,20 +15,20 @@ export interface GalleryImage {
 }
 
 export const PLANET_TEXTURES = {
-  mercury: { map: new URL('../public/textures/planets/mercury/main.jpg', import.meta.url).href, tilt: 0.03 },
-  venus:   { map: new URL('../public/textures/planets/venus/main.jpg',   import.meta.url).href, tilt: 0.046 },
-  earth:   { map: new URL('../public/textures/planets/earth/main.jpg',   import.meta.url).href,
-             clouds: new URL('../public/textures/planets/earth/clouds.png', import.meta.url).href, tilt: 0.408 },
-  mars:    { map: new URL('../public/textures/planets/mars/main.jpg',    import.meta.url).href, tilt: 0.44 },
-  jupiter: { map: new URL('../public/textures/planets/jupiter/main.jpg', import.meta.url).href, tilt: 0.054 },
-  saturn:  { map: new URL('../public/textures/planets/saturn/main.jpg',  import.meta.url).href,
-             ring: new URL('../public/textures/planets/saturn/rings.png', import.meta.url).href, tilt: 0.467 },
-  uranus:  { map: new URL('../public/textures/planets/uranus/main.jpg',  import.meta.url).href, tilt: 1.706 },
-  neptune: { map: new URL('../public/textures/planets/neptune/main.jpg', import.meta.url).href, tilt: 0.494 },
+  mercury: { map: new URL('../textures/planets/mercury/main.jpg', import.meta.url).href, tilt: 0.03 },
+  venus:   { map: new URL('../textures/planets/venus/main.jpg',   import.meta.url).href, tilt: 0.046 },
+  earth:   { map: new URL('../textures/planets/earth/main.jpg',   import.meta.url).href,
+             clouds: new URL('../textures/planets/earth/clouds.png', import.meta.url).href, tilt: 0.408 },
+  mars:    { map: new URL('../textures/planets/mars/main.jpg',    import.meta.url).href, tilt: 0.44 },
+  jupiter: { map: new URL('../textures/planets/jupiter/main.jpg', import.meta.url).href, tilt: 0.054 },
+  saturn:  { map: new URL('../textures/planets/saturn/main.jpg',  import.meta.url).href,
+             ring: new URL('../textures/planets/saturn/rings.png', import.meta.url).href, tilt: 0.467 },
+  uranus:  { map: new URL('../textures/planets/uranus/main.jpg',  import.meta.url).href, tilt: 1.706 },
+  neptune: { map: new URL('../textures/planets/neptune/main.jpg', import.meta.url).href, tilt: 0.494 },
 };
 
 /**
- * Gallery images — all paths are local under /public/assets/planets/
+ * Gallery images — all paths are local under /assets/planets/
  * Drop the actual files there before building.
  * See README section "Local Assets" for the download list.
  */
