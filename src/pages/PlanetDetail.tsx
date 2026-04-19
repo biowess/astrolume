@@ -22,7 +22,7 @@ import {
 import { cn } from '../lib/utils';
 import { PLANET_GALLERY } from '../data/planetMedia';
 import type { GalleryImage } from '../data/planetMedia';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,21 +94,9 @@ function GalleryCard({
 }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  <img
-  ref={imgRef}
-  src={img.src} // ← set immediately, browser uses cache
-  alt={img.caption}
-  className={cn(...)}
-  onLoad={() => setLoaded(true)}
-  onError={() => setError(true)}
-/>
 
   return (
     <div
-      ref={wrapRef}
       className="flex-shrink-0 w-68 md:w-76 snap-start cursor-zoom-in group"
       onClick={onClick}
     >
@@ -127,7 +115,7 @@ function GalleryCard({
         )}
 
         <img
-          ref={imgRef}
+          src={img.src}
           alt={img.caption}
           className={cn(
             'w-full h-full object-cover transition-all duration-500 group-hover:scale-105',
@@ -333,6 +321,14 @@ export function PlanetDetail() {
   const gallery = planet ? PLANET_GALLERY[planet.id] ?? [] : [];
   const fact = planet ? PLANET_FACTS[planet.id] : '';
 
+  // Preload all 3 gallery images immediately on page open, before user scrolls
+  useEffect(() => {
+    gallery.forEach((img) => {
+      const preloader = new Image();
+      preloader.src = img.src;
+    });
+  }, [planet?.id]);
+
   const openModal = useCallback((i: number) => setModalIndex(i), []);
   const closeModal = useCallback(() => setModalIndex(null), []);
   const prevModal = useCallback(
@@ -350,13 +346,6 @@ export function PlanetDetail() {
     [gallery.length]
   );
 
-useEffect(() => {
-  gallery.forEach((img) => {
-    const preloader = new Image();
-    preloader.src = img.src;
-  });
-}, [planet?.id]);
-  
   if (!planet) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center">
