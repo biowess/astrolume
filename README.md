@@ -257,7 +257,7 @@ If those assets are missing, the app will still boot, but the visual fidelity an
 
 **Suggested license: GNU General Public License v3.0 (GPLv3).**
 
-This project is intended to remain strongly copyleft: any redistributed or modified version should preserve the same freedoms under GPLv3 terms. If a proprietary distribution model is preferred, replace this section with **All Rights Reserved** and add an explicit LICENSE file that matches that policy.
+This project is intended to remain strongly copyleft: any redistributed or modified version should preserve the same freedoms under GPLv3 terms.
 
 ---
 
