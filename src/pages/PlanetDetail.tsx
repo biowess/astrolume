@@ -97,23 +97,14 @@ function GalleryCard({
   const imgRef = useRef<HTMLImageElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting && imgRef.current) {
-          imgRef.current.src = img.src;
-          obs.disconnect();
-        }
-      },
-      { rootMargin: '300px' }
-    );
-
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [img.src]);
+  <img
+  ref={imgRef}
+  src={img.src} // ← set immediately, browser uses cache
+  alt={img.caption}
+  className={cn(...)}
+  onLoad={() => setLoaded(true)}
+  onError={() => setError(true)}
+/>
 
   return (
     <div
@@ -359,6 +350,13 @@ export function PlanetDetail() {
     [gallery.length]
   );
 
+useEffect(() => {
+  gallery.forEach((img) => {
+    const preloader = new Image();
+    preloader.src = img.src;
+  });
+}, [planet?.id]);
+  
   if (!planet) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center">
