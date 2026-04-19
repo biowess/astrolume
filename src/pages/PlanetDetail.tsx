@@ -116,7 +116,7 @@ function GalleryCard({
 
         <img
           src={img.src}
-          alt={img.caption}
+          alt={img.alt}
           className={cn(
             'w-full h-full object-cover transition-all duration-500 group-hover:scale-105',
             loaded ? 'opacity-100' : 'opacity-0'
@@ -133,7 +133,7 @@ function GalleryCard({
       </div>
 
       <p className="mt-2 font-serif text-sm text-[var(--text)] leading-snug line-clamp-2">
-        {img.caption}
+        {img.alt}
       </p>
       <p className="mt-1 font-mono text-[10px] text-[var(--text-muted)] tracking-widest uppercase">
         {img.credit}
@@ -190,13 +190,13 @@ function ImageModal({
       >
         <img
           src={img.src}
-          alt={img.caption}
+          alt={img.alt}
           className="w-full max-h-[72vh] object-contain rounded-lg"
         />
 
         <div className="mt-4 flex justify-between items-start">
           <div>
-            <p className="font-serif text-base text-[var(--text)]">{img.caption}</p>
+            <p className="font-serif text-base text-[var(--text)]">{img.alt}</p>
             <p className="font-mono text-xs text-[var(--text-muted)] mt-1 tracking-widest uppercase">
               {img.credit}
             </p>
