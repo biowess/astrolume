@@ -261,7 +261,8 @@ export function PlanetOrb({
   const cloudsRef = useRef<THREE.Mesh>(null);
   const settings = useStore((s) => s.settings);
 
-  const def = PLANET_TEXTURES[planetId as keyof typeof PLANET_TEXTURES];
+  const def = PLANET_TEXTURES[planetId as keyof typeof PLANET_TEXTURES] as
+    { map: string; tilt: number; clouds?: string; ring?: string };
   const mapTex = useCachedTexture(def?.map);
   const cloudTex = useCachedTexture(def?.clouds);
   const ringTex = useCachedTexture(def?.ring);
